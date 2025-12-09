@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  pinHash   String   @map("pin_hash")
+  role      String   // "employee" or "admin"
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  orders    Order[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?  @map("image_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  items       Item[]
+
+  @@map("categories")
+}
+
+model Item {
+  id          String    @id @default(cuid())
+  categoryId  String    @map("category_id")
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  price       Decimal   @db.Decimal(10, 2)
+  imageUrl    String?   @map("image_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  orderItems  OrderItem[]
+
+  @@map("items")
+}
+
+model Order {
+  id         String     @id @default(cuid())
+  userId     String     @map("user_id")
+  user       User       @relation(fields: [userId], references: [id])
+  totalPrice Decimal    @map("total_price") @db.Decimal(10, 2)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String   @map("order_id")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId    String   @map("item_id")
+  item      Item     @relation(fields: [itemId], references: [id])
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  lineTotal Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("order_items")
+}
+
+
+
+
