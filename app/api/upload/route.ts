@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     // Upload to Supabase Storage (bucket: public)
     const { data, error } = await supabaseAdmin.storage
-      .from('public')
+      .from('uploads')
       .upload(filename, buffer, {
         contentType: file.type,
         cacheControl: '3600',
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     // Get public URL
     const { data: urlData } = supabaseAdmin.storage
-      .from('public')
+      .from('uploads')
       .getPublicUrl(data.path);
 
     return NextResponse.json({ imageUrl: urlData.publicUrl });
