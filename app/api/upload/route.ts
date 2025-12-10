@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const randomString = Math.random().toString(36).substring(2, 15)
     const extension = file.name.split('.').pop()
-    const filename = `${timestamp}-${randomString}.${extension}`
+    const filename = ${timestamp}-${randomString}.${extension}
 
     // Create uploads directory if it doesn't exist
     const uploadsDir = join(process.cwd(), 'public', 'uploads')
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     await writeFile(filepath, buffer)
 
     // Return the public URL
-    const imageUrl = `/uploads/${filename}`
+    const imageUrl = /uploads/${filename}
 
     return NextResponse.json({ imageUrl })
   } catch (error: any) {
@@ -74,6 +74,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-
-
