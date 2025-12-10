@@ -1,76 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { requireAuth } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
+import { supabaseAdmin } from '@/lib/supabase';
+import { requireAuth } from '@/lib/auth';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAuth(request)
+    // Check user is logged in
+    await requireAuth(request);
 
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // Validate file type
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: 'Invalid file type. Only images are allowed.' },
+        { error: 'Invalid file type. Only images allowed.' },
         { status: 400 }
-      )
+      );
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024 // 5MB
+    // Validate size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File size too large. Maximum 5MB allowed.' },
+        { error: 'File too large (max 5MB).' },
         { status: 400 }
-      )
+      );
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    // Convert File → Buffer
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
     // Generate unique filename
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 15)
-    const extension = file.name.split('.').pop()
-    const filename = ${timestamp}-${randomString}.${extension}
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = `${randomUUID()}.${ext}`;
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = join(process.cwd(), 'public', 'uploads')
-    try {
-      await mkdir(uploadsDir, { recursive: true })
-    } catch (error) {
-      // Directory might already exist, that's fine
+    // Upload to Supabase Storage (bucket: public)
+    const { data, error } = await supabaseAdmin.storage
+      .from('public')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
     }
 
-    // Save file
-    const filepath = join(uploadsDir, filename)
-    await writeFile(filepath, buffer)
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage
+      .from('public')
+      .getPublicUrl(data.path);
 
-    // Return the public URL
-    const imageUrl = /uploads/${filename}
-
-    return NextResponse.json({ imageUrl })
+    return NextResponse.json({ imageUrl: urlData.publicUrl });
   } catch (error: any) {
-    if (error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+    if (error?.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    console.error('Error uploading file:', error)
-    return NextResponse.json(
-      { error: 'Failed to upload file' },
-      { status: 500 }
-    )
+
+    console.error('Unexpected error:', error);
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
   }
 }
