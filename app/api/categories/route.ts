@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, requireAdmin } from '@/lib/auth'
 import { z } from 'zod'
 
-// GET /api/categories - Get all categories (authenticated users)
+// GET /api/categories - Get all categories (authenticated users, excluding archived)
 export async function GET(request: NextRequest) {
   try {
     await requireAuth(request)
 
     const categories = await prisma.category.findMany({
+      where: { archived: false },
       orderBy: { createdAt: 'desc' },
     })
 
@@ -49,6 +50,7 @@ export async function POST(request: NextRequest) {
         )
         .optional()
         .nullable(),
+      archived: z.boolean().optional(),
     })
 
     const data = schema.parse(body)
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
         name: data.name,
         description: data.description || null,
         imageUrl: data.imageUrl || null,
+        archived: data.archived ?? false,
       },
     })
 

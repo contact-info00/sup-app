@@ -1,4 +1,3 @@
-export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -40,9 +39,9 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Generate unique filename
-    const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `${randomUUID()}.${ext}`;
+    // Generate unique filename (store under uploads/ folder in bucket)
+    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
+    const filename = `uploads/${randomUUID()}.${ext}`;
 
     // Upload to Supabase Storage (bucket: public)
     const { data, error } = await supabaseAdmin.storage

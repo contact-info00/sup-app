@@ -81,9 +81,21 @@ export async function DELETE(
   try {
     await requireAdmin(request)
 
-    await prisma.item.delete({
-      where: { id: params.id },
+    // If item has order history, archive instead of hard delete
+    const orderItemsCount = await prisma.orderItem.count({
+      where: { itemId: params.id },
     })
+
+    if (orderItemsCount > 0) {
+      await prisma.item.update({
+        where: { id: params.id },
+        data: { archived: true },
+      })
+      return NextResponse.json({ message: 'Item archived (had existing orders)' })
+    }
+
+    // No order history -> safe to delete
+    await prisma.item.delete({ where: { id: params.id } })
 
     return NextResponse.json({ message: 'Item deleted' })
   } catch (error: any) {

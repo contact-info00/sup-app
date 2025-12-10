@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 interface Category {
   id: string
   name: string
+  archived?: boolean
 }
 
 export default function Navbar() {
@@ -26,7 +27,7 @@ export default function Navbar() {
       })
       if (response.ok) {
         const data = await response.json()
-        setCategories(data)
+        setCategories(data.filter((c: Category) => !c.archived))
       }
     } catch (error) {
       console.error('Error fetching categories:', error)

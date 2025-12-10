@@ -10,6 +10,7 @@ interface Category {
   name: string
   description: string | null
   imageUrl: string | null
+  archived?: boolean
 }
 
 export default function CategoriesPage() {
@@ -32,7 +33,7 @@ export default function CategoriesPage() {
       }
       if (response.ok) {
         const data = await response.json()
-        setCategories(data)
+        setCategories(data.filter((c: Category) => !c.archived))
       }
     } catch (error) {
       console.error('Error fetching categories:', error)
