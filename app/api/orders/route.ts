@@ -123,6 +123,7 @@ export async function POST(request: NextRequest) {
     let marketId = data.marketId || user.marketId || null
 
     // Create order with order items in a transaction
+    // Set a longer timeout for transactions that include market balance updates
     const order = await prisma.$transaction(async (tx) => {
       // Calculate total price
       const totalPrice = data.items.reduce(
@@ -130,9 +131,47 @@ export async function POST(request: NextRequest) {
         0
       )
 
+      // For MARKET_OWNER, we need a valid userId from users table
+      // Markets are not users, so we use a system/admin user for market orders
+      let orderUserId = user.userId
+      if (user.role === 'MARKET_OWNER') {
+        // Ensure marketId is set (from request or user's marketId)
+        if (!marketId && user.marketId) {
+          marketId = user.marketId
+        }
+        
+        // Validate marketId exists
+        if (!marketId) {
+          throw new Error('Market ID is required for market owner orders')
+        }
+        
+        // Find or use the first admin user as the system user for market orders
+        const systemUser = await tx.user.findFirst({
+          where: {
+            role: { in: ['ADMIN', 'admin'] },
+          },
+          select: { id: true },
+        })
+        
+        if (systemUser) {
+          orderUserId = systemUser.id
+        } else {
+          // Fallback: try to find any user (shouldn't happen if seed ran correctly)
+          const anyUser = await tx.user.findFirst({
+            select: { id: true },
+          })
+          if (anyUser) {
+            orderUserId = anyUser.id
+            console.warn('No admin user found, using first available user for market order')
+          } else {
+            throw new Error('No users found in database. Please run database seed first.')
+          }
+        }
+      }
+
       const newOrder = await tx.order.create({
         data: {
-          userId: user.userId,
+          userId: orderUserId,
           marketId: marketId,
           total_price: totalPrice,
         },
@@ -155,6 +194,8 @@ export async function POST(request: NextRequest) {
       // Update market balance if marketId is provided
       if (marketId) {
         const totalPriceIQD = Math.round(totalPrice) // Convert to integer IQD
+        
+        // Update market balance (will throw error if market doesn't exist, rolling back transaction)
         await tx.market.update({
           where: { id: marketId },
           data: {
@@ -191,8 +232,17 @@ export async function POST(request: NextRequest) {
       )
     }
     console.error('Error creating order:', error)
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      stack: error?.stack,
+    })
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      },
       { status: 500 }
     )
   }

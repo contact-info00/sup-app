@@ -158,6 +158,9 @@ export default function BasketPage() {
       return
     }
 
+    // For MARKET_OWNER, ensure marketId is set from user.marketId if not already set
+    const finalMarketId = selectedMarketId || user?.marketId || undefined
+
     setCheckingOut(true)
     try {
       const orderItems = basketItems.map((basketItem) => ({
@@ -172,7 +175,7 @@ export default function BasketPage() {
         credentials: 'include',
         body: JSON.stringify({
           items: orderItems,
-          marketId: selectedMarketId || undefined,
+          marketId: finalMarketId,
         }),
       })
 
