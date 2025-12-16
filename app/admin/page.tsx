@@ -37,7 +37,7 @@ export default function AdminDashboard() {
       if (response.ok) {
         const data = await response.json()
         setUser(data.user)
-        if (data.user.role !== 'admin') {
+        if (data.user.role !== 'ADMIN') {
           router.push('/categories')
         }
       }
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
                 Total Sales Today
               </h3>
               <p className="text-3xl font-bold text-primary-600">
-                {overview.totalSalesToday.toLocaleString('en-US')} IQD
+              {Number(overview?.totalSalesToday ?? 0).toLocaleString('en-US')} IQD
               </p>
             </div>
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -142,6 +142,18 @@ export default function AdminDashboard() {
           </Link>
 
           <Link
+            href="/admin/markets"
+            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition cursor-pointer"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Markets
+            </h2>
+            <p className="text-gray-600 text-sm">
+              Manage markets
+            </p>
+          </Link>
+
+          <Link
             href="/admin/users"
             className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition cursor-pointer"
           >
@@ -150,6 +162,18 @@ export default function AdminDashboard() {
             </h2>
             <p className="text-gray-600 text-sm">
               Manage user accounts and PINs
+            </p>
+          </Link>
+
+          <Link
+            href="/admin/orders"
+            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition cursor-pointer"
+          >
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              Orders
+            </h2>
+            <p className="text-gray-600 text-sm">
+              View and manage orders
             </p>
           </Link>
 

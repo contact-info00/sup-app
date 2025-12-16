@@ -13,7 +13,7 @@ async function main() {
       id: 'admin-1',
       name: 'Admin User',
       pinHash: adminPinHash,
-      role: 'admin',
+      role: 'ADMIN',
     },
   })
 
@@ -26,7 +26,7 @@ async function main() {
       id: 'employee-1',
       name: 'Employee User',
       pinHash: employeePinHash,
-      role: 'employee',
+      role: 'EMPLOYEE',
     },
   })
 

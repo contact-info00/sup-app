@@ -11,13 +11,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('category_id')
-    const includeArchived = searchParams.get('include_archived') === 'true'
 
     const items = await prisma.item.findMany({
-      where: {
-        ...(includeArchived ? {} : { archived: false }),
-        ...(categoryId ? { categoryId } : {}),
-      },
+      where: categoryId ? { categoryId } : undefined,
       include: {
         category: {
           select: {

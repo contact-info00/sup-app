@@ -22,10 +22,54 @@ export default function BasketPage() {
   const [basketItems, setBasketItems] = useState<BasketItem[]>([])
   const [loading, setLoading] = useState(true)
   const [checkingOut, setCheckingOut] = useState(false)
+  const [showNoteField, setShowNoteField] = useState(false)
+  const [orderNote, setOrderNote] = useState('')
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null)
+  const [markets, setMarkets] = useState<Array<{ id: string; name: string }>>([])
+  const [user, setUser] = useState<{ role: string; marketId?: string } | null>(null)
 
   useEffect(() => {
     loadBasket()
+    fetchUser()
+    fetchMarkets()
   }, [])
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+        if (data.user.role === 'MARKET_OWNER' && data.user.marketId) {
+          setSelectedMarketId(data.user.marketId)
+        } else if (data.user.role === 'EMPLOYEE') {
+          // Get selected market from localStorage
+          const savedMarketId = localStorage.getItem('selectedMarketId')
+          if (savedMarketId) {
+            setSelectedMarketId(savedMarketId)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error)
+    }
+  }
+
+  const fetchMarkets = async () => {
+    try {
+      const response = await fetch('/api/markets', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setMarkets(data)
+      }
+    } catch (error) {
+      console.error('Error fetching markets:', error)
+    }
+  }
 
   const loadBasket = async () => {
     try {
@@ -98,8 +142,21 @@ export default function BasketPage() {
     0
   )
 
+  const handleProceedToCheckout = () => {
+    if (!selectedMarketId && user?.role === 'EMPLOYEE') {
+      alert('Please select a market')
+      return
+    }
+    setShowNoteField(true)
+  }
+
   const handleCheckout = async () => {
     if (basketItems.length === 0) return
+
+    if (!selectedMarketId && user?.role === 'EMPLOYEE') {
+      alert('Please select a market')
+      return
+    }
 
     setCheckingOut(true)
     try {
@@ -113,7 +170,10 @@ export default function BasketPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ items: orderItems }),
+        body: JSON.stringify({
+          items: orderItems,
+          marketId: selectedMarketId || undefined,
+        }),
       })
 
       if (response.status === 401) {
@@ -153,7 +213,23 @@ export default function BasketPage() {
     <>
       <Navbar />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Basket</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8 flex items-center gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-8 w-8"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+            />
+          </svg>
+          Basket
+        </h1>
 
         {basketItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -167,6 +243,25 @@ export default function BasketPage() {
           </div>
         ) : (
           <>
+            {user?.role === 'EMPLOYEE' && !selectedMarketId && (
+              <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Market *
+                </label>
+                <select
+                  value={selectedMarketId || ''}
+                  onChange={(e) => setSelectedMarketId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
+                >
+                  <option value="">Select a market...</option>
+                  {markets.map((market) => (
+                    <option key={market.id} value={market.id}>
+                      {market.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
               {basketItems.map((basketItem) => (
                 <div
@@ -243,19 +338,62 @@ export default function BasketPage() {
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-center mb-6">
-                <span className="text-2xl font-bold text-gray-900">Total:</span>
-                <span className="text-3xl font-bold text-primary-600">
-                  {totalPrice.toLocaleString('en-US')} IQD
-                </span>
-              </div>
-              <button
-                onClick={handleCheckout}
-                disabled={checkingOut}
-                className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {checkingOut ? 'Processing...' : 'Checkout'}
-              </button>
+              {!showNoteField ? (
+                <>
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-2xl font-bold text-gray-900">Total:</span>
+                    <span className="text-3xl font-bold text-primary-600">
+                      {totalPrice.toLocaleString('en-US')} IQD
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleProceedToCheckout}
+                    disabled={checkingOut || (user?.role === 'EMPLOYEE' && !selectedMarketId)}
+                    className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                  >
+                    Proceed to Checkout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Order Note (optional)
+                    </label>
+                    <textarea
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
+                      placeholder="Add any special instructions or notes..."
+                    />
+                  </div>
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="text-2xl font-bold text-gray-900">Total:</span>
+                    <span className="text-3xl font-bold text-primary-600">
+                      {totalPrice.toLocaleString('en-US')} IQD
+                    </span>
+                  </div>
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => {
+                        setShowNoteField(false)
+                        setOrderNote('')
+                      }}
+                      className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleCheckout}
+                      disabled={checkingOut}
+                      className="flex-1 bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {checkingOut ? 'Processing...' : 'Submit Order'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}

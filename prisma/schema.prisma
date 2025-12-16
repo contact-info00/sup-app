@@ -1,20 +1,18 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+
 }
 
 model User {
   id        String   @id @default(cuid())
   name      String
   pinHash   String   @map("pin_hash")
-  role      String   // "employee" or "admin"
+  role      String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   orders    Order[]
@@ -22,60 +20,82 @@ model User {
   @@map("users")
 }
 
+model Market {
+  id          String         @id @default(cuid())
+  name        String
+  phoneNumber String         @unique
+  description String?
+  balanceDue  Int            @default(0) @map("balance_due")
+  orders      Order[]
+  ledger      MarketLedger[]
+
+  @@map("markets")
+}
+
 model Category {
   id          String   @id @default(cuid())
   name        String
   description String?
   imageUrl    String?  @map("image_url")
-  archived    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
+  archived    Boolean  @default(false)
   items       Item[]
 
   @@map("categories")
 }
 
 model Item {
-  id          String    @id @default(cuid())
-  categoryId  String    @map("category_id")
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  id          String      @id @default(cuid())
+  categoryId  String      @map("category_id")
   name        String
   description String?
-  price       Decimal   @db.Decimal(10, 2)
-  imageUrl    String?   @map("image_url")
-  archived    Boolean   @default(false)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  price       Decimal     @db.Decimal(10, 2)
+  imageUrl    String?     @map("image_url")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  archived    Boolean     @default(false)
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   orderItems  OrderItem[]
 
   @@map("items")
 }
 
 model Order {
-  id         String     @id @default(cuid())
-  userId     String     @map("user_id")
-  user       User       @relation(fields: [userId], references: [id])
-  totalPrice Decimal    @map("total_price") @db.Decimal(10, 2)
-  createdAt  DateTime   @default(now()) @map("created_at")
-  orderItems OrderItem[]
+  id          String      @id @default(cuid())
+  userId      String      @map("user_id")
+  marketId    String?     @map("market_id")
+  total_price Decimal     @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  orderItems  OrderItem[]
+  user        User        @relation(fields: [userId], references: [id])
+  market      Market?     @relation(fields: [marketId], references: [id])
 
   @@map("orders")
 }
 
 model OrderItem {
-  id        String   @id @default(cuid())
-  orderId   String   @map("order_id")
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  itemId    String   @map("item_id")
-  item      Item     @relation(fields: [itemId], references: [id])
-  quantity  Int
-  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
-  lineTotal Decimal  @map("line_total") @db.Decimal(10, 2)
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(cuid())
+  orderId    String   @map("order_id")
+  itemId     String   @map("item_id")
+  quantity   Int
+  unit_price Decimal  @db.Decimal(10, 2)
+  lineTotal  Decimal  @map("line_total") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+  item       Item     @relation(fields: [itemId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }
 
+model MarketLedger {
+  id        String   @id @default(cuid())
+  marketId  String   @map("market_id")
+  amount    Int
+  type      String   // "CHARGE" | "PAYMENT" | "MANUAL"
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  market    Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
-
-
+  @@map("market_ledger")
+}

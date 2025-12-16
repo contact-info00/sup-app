@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react'
 interface Category {
   id: string
   name: string
-  archived?: boolean
 }
 
 export default function Navbar() {
@@ -27,7 +26,7 @@ export default function Navbar() {
       })
       if (response.ok) {
         const data = await response.json()
-        setCategories(data.filter((c: Category) => !c.archived))
+        setCategories(data)
       }
     } catch (error) {
       console.error('Error fetching categories:', error)
@@ -86,10 +85,18 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             {user && (
               <>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-600 hidden sm:inline">
                   {user.name} ({user.role})
                 </span>
-                {user.role === 'admin' && (
+                {(user.role === 'ADMIN' || user.role === 'EMPLOYEE') && (
+                  <Link
+                    href="/admin/markets"
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Add Market
+                  </Link>
+                )}
+                {(user.role === 'ADMIN' || user.role === 'EMPLOYEE') && (
                   <Link
                     href="/admin"
                     className="text-sm text-primary-600 hover:text-primary-700 font-medium"
@@ -99,9 +106,23 @@ export default function Navbar() {
                 )}
                 <Link
                   href="/basket"
-                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  className="text-primary-600 hover:text-primary-700"
+                  title="Basket"
                 >
-                  Basket
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -114,18 +135,38 @@ export default function Navbar() {
           </div>
         </div>
       </div>
-      {/* Mobile categories */}
-      <div className="md:hidden border-t border-gray-200 px-4 py-2 overflow-x-auto">
-        <div className="flex space-x-2">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              href={`/categories/${category.id}`}
-              className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap"
-            >
-              {category.name}
-            </Link>
-          ))}
+      {/* Mobile menu */}
+      <div className="md:hidden border-t border-gray-200 px-4 py-2">
+        <div className="flex space-x-4 items-center mb-2">
+          {user && (user.role === 'ADMIN' || user.role === 'EMPLOYEE') && (
+            <>
+              <Link
+                href="/admin/markets"
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+              >
+                Add Market
+              </Link>
+              <Link
+                href="/admin"
+                className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+              >
+                Admin
+              </Link>
+            </>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          <div className="flex space-x-2">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/categories/${category.id}`}
+                className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap"
+              >
+                {category.name}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </nav>

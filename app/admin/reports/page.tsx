@@ -44,10 +44,17 @@ interface SalesReport {
   }>
 }
 
+interface DailyItem {
+  itemId: string
+  itemName: string
+  totalQuantity: number
+}
+
 export default function AdminReportsPage() {
   const router = useRouter()
   const [topSelling, setTopSelling] = useState<TopSellingItem[]>([])
   const [salesReport, setSalesReport] = useState<SalesReport | null>(null)
+  const [dailyItems, setDailyItems] = useState<DailyItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -60,11 +67,14 @@ export default function AdminReportsPage() {
   const fetchReports = async () => {
     setLoading(true)
     try {
-      const [topSellingRes, salesRes] = await Promise.all([
+      const [topSellingRes, salesRes, dailyItemsRes] = await Promise.all([
         fetch(`/api/reports/top-selling?date=${selectedDate}&limit=10`, {
           credentials: 'include',
         }),
         fetch(`/api/reports/sales?date=${selectedDate}`, {
+          credentials: 'include',
+        }),
+        fetch(`/api/reports/daily-items?date=${selectedDate}`, {
           credentials: 'include',
         }),
       ])
@@ -79,11 +89,13 @@ export default function AdminReportsPage() {
         return
       }
 
-      if (topSellingRes.ok && salesRes.ok) {
+      if (topSellingRes.ok && salesRes.ok && dailyItemsRes.ok) {
         const topSellingData = await topSellingRes.json()
         const salesData = await salesRes.json()
+        const dailyItemsData = await dailyItemsRes.json()
         setTopSelling(topSellingData)
         setSalesReport(salesData)
+        setDailyItems(dailyItemsData.items || [])
       }
     } catch (error) {
       console.error('Error fetching reports:', error)
@@ -117,7 +129,7 @@ export default function AdminReportsPage() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
             />
           </div>
         </div>
@@ -130,7 +142,7 @@ export default function AdminReportsPage() {
                 Total Revenue
               </h3>
               <p className="text-3xl font-bold text-primary-600">
-                {salesReport.totalRevenue.toLocaleString('en-US')} IQD
+                {Number(salesReport?.totalRevenue ?? 0).toLocaleString('en-US')} IQD
               </p>
             </div>
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -138,7 +150,7 @@ export default function AdminReportsPage() {
                 Total Orders
               </h3>
               <p className="text-3xl font-bold text-primary-600">
-                {salesReport.totalOrders}
+                {salesReport?.totalOrders ?? 0}
               </p>
             </div>
             <div className="bg-white rounded-lg shadow-md p-6">
@@ -146,13 +158,13 @@ export default function AdminReportsPage() {
                 Items Sold
               </h3>
               <p className="text-3xl font-bold text-primary-600">
-                {salesReport.itemsSold}
+                {salesReport?.itemsSold ?? 0}
               </p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Top Selling Items */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
@@ -189,9 +201,35 @@ export default function AdminReportsPage() {
                       </p>
                       <p className="text-sm text-gray-600 mt-1">
                         Quantity: {item.totalQuantity} | Revenue:{' '}
-                        {item.totalRevenue.toLocaleString('en-US')} IQD
+                        {Number(item.totalRevenue ?? 0).toLocaleString('en-US')} IQD
                       </p>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Daily Items Count */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Daily Item Counts
+            </h2>
+            {dailyItems.length === 0 ? (
+              <p className="text-gray-500">No items sold on this date</p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {dailyItems.map((item) => (
+                  <div
+                    key={item.itemId}
+                    className="flex justify-between items-center p-3 border border-gray-200 rounded-lg"
+                  >
+                    <span className="font-medium text-gray-900">
+                      {item.itemName}
+                    </span>
+                    <span className="text-lg font-bold text-primary-600">
+                      {item.totalQuantity}
+                    </span>
                   </div>
                 ))}
               </div>

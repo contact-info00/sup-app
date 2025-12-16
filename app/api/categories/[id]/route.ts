@@ -26,7 +26,6 @@ export async function PUT(
         )
         .optional()
         .nullable(),
-      archived: z.boolean().optional(),
     })
 
     const data = schema.parse(body)
@@ -37,7 +36,6 @@ export async function PUT(
         ...(data.name && { name: data.name }),
         ...(data.description !== undefined && { description: data.description || null }),
         ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl || null }),
-        ...(data.archived !== undefined && { archived: data.archived }),
       },
     })
 
@@ -71,66 +69,9 @@ export async function DELETE(
   try {
     await requireAdmin(request)
 
-    const { searchParams } = new URL(request.url)
-    const force = searchParams.get('force') === 'true'
-
-    // Prevent deleting categories that have items involved in orders unless force=true
-    const orderItemsCount = await prisma.orderItem.count({
-      where: {
-        item: {
-          categoryId: params.id,
-        },
-      },
+    await prisma.category.delete({
+      where: { id: params.id },
     })
-
-    if (orderItemsCount > 0 && !force) {
-      // Archive instead of delete
-      await prisma.category.update({
-        where: { id: params.id },
-        data: { archived: true },
-      })
-      return NextResponse.json(
-        {
-          message:
-            'Category archived because items have existing orders. To delete everything, call with ?force=true to remove related orders/items.',
-        },
-        { status: 200 }
-      )
-    }
-
-    if (orderItemsCount > 0 && force) {
-      // Force delete: delete orderItems -> orders without orderItems -> items -> category
-      await prisma.$transaction(async (tx) => {
-        // Delete order_items for items in category
-        await tx.orderItem.deleteMany({
-          where: {
-            item: { categoryId: params.id },
-          },
-        })
-
-        // Delete orders that now have no order_items
-        await tx.order.deleteMany({
-          where: {
-            orderItems: { none: {} },
-          },
-        })
-
-        // Delete items in category
-        await tx.item.deleteMany({
-          where: { categoryId: params.id },
-        })
-
-        // Delete category
-        await tx.category.delete({
-          where: { id: params.id },
-        })
-      })
-
-      return NextResponse.json({ message: 'Category and related data deleted (force)' })
-    }
-
-    // No order history -> safe to delete
-    await prisma.category.delete({ where: { id: params.id } })
 
     return NextResponse.json({ message: 'Category deleted' })
   } catch (error: any) {

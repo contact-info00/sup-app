@@ -10,17 +10,44 @@ interface Category {
   name: string
   description: string | null
   imageUrl: string | null
-  archived?: boolean
 }
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<{ role: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
+    checkAuth()
     fetchCategories()
   }, [])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+        // For employees, check if market is selected
+        if (data.user.role === 'EMPLOYEE') {
+          const selectedMarketId = localStorage.getItem('selectedMarketId')
+          if (!selectedMarketId) {
+            router.push('/employee/markets')
+            return
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error)
+    }
+  }
 
   const fetchCategories = async () => {
     try {
@@ -33,7 +60,7 @@ export default function CategoriesPage() {
       }
       if (response.ok) {
         const data = await response.json()
-        setCategories(data.filter((c: Category) => !c.archived))
+        setCategories(data)
       }
     } catch (error) {
       console.error('Error fetching categories:', error)
@@ -42,7 +69,7 @@ export default function CategoriesPage() {
     }
   }
 
-  if (loading) {
+  if (loading || (user?.role === 'EMPLOYEE' && !localStorage.getItem('selectedMarketId'))) {
     return (
       <>
         <Navbar />

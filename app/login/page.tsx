@@ -4,18 +4,31 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  const [pin, setPin] = useState('')
+  const [credential, setCredential] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  const getMaxLength = () => {
+    // Auto-detect: if starts with digit and is <= 4, allow up to 4 (PIN), otherwise allow up to 10 (phone)
+    if (credential.length <= 4 && /^\d{1,4}$/.test(credential)) {
+      return 4
+    }
+    return 10
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
-    if (pin.length !== 4) {
-      setError('PIN must be exactly 4 digits')
+    const maxLen = getMaxLength()
+    if (credential.length !== maxLen) {
+      if (maxLen === 4) {
+        setError('PIN must be exactly 4 digits')
+      } else {
+        setError('Phone number must be exactly 10 digits')
+      }
       setLoading(false)
       return
     }
@@ -25,20 +38,24 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ credential }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        setError(data.error || 'Invalid PIN')
+        setError(data.error || 'Invalid credentials')
         setLoading(false)
         return
       }
 
       // Redirect based on role
-      if (data.user.role === 'admin') {
+      if (data.user.role === 'ADMIN') {
         router.push('/admin')
+      } else if (data.user.role === 'EMPLOYEE') {
+        router.push('/employee/markets')
+      } else if (data.user.role === 'MARKET_OWNER') {
+        router.push('/categories')
       } else {
         router.push('/categories')
       }
@@ -49,20 +66,31 @@ export default function LoginPage() {
   }
 
   const handleNumberClick = (num: string) => {
-    if (pin.length < 4) {
-      setPin(pin + num)
+    const maxLen = getMaxLength()
+    if (credential.length < maxLen) {
+      setCredential(credential + num)
       setError('')
     }
   }
 
   const handleClear = () => {
-    setPin('')
+    setCredential('')
     setError('')
   }
 
   const handleBackspace = () => {
-    setPin(pin.slice(0, -1))
+    setCredential(credential.slice(0, -1))
     setError('')
+  }
+
+  const getInputLabel = () => {
+    if (credential.length === 0) {
+      return 'Enter PIN (4 digits) or Phone (10 digits)'
+    }
+    if (credential.length <= 4) {
+      return 'Enter 4-Digit PIN'
+    }
+    return 'Enter 10-Digit Phone Number'
   }
 
   return (
@@ -74,22 +102,23 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Enter 4-Digit PIN
+              {getInputLabel()}
             </label>
             <input
               type="password"
               inputMode="numeric"
-              maxLength={4}
-              value={pin}
+              maxLength={10}
+              value={credential}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '')
-                if (value.length <= 4) {
-                  setPin(value)
+                const maxLen = value.length <= 4 ? 4 : 10
+                if (value.length <= maxLen) {
+                  setCredential(value)
                   setError('')
                 }
               }}
-              className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none"
-              placeholder="••••"
+              className="w-full px-4 py-3 text-center text-2xl font-mono tracking-widest border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none text-black"
+              placeholder={credential.length <= 4 ? "••••" : "••••••••••"}
               autoFocus
             />
           </div>
@@ -102,7 +131,7 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading || pin.length !== 4}
+            disabled={loading || (credential.length !== 4 && credential.length !== 10)}
             className="w-full bg-primary-600 text-white py-3 rounded-lg font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? 'Logging in...' : 'Login'}

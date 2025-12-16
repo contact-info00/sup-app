@@ -11,14 +11,16 @@ export default function Home() {
     const checkAuth = async () => {
       try {
         const response = await fetch('/api/auth/me', { credentials: 'include' })
-        if (response.ok) {
-          const data = await response.json()
-          if (data.user.role === 'admin') {
-            router.push('/admin')
-          } else {
-            router.push('/categories')
-          }
+      if (response.ok) {
+        const data = await response.json()
+        if (data.user.role === 'ADMIN') {
+          router.push('/admin')
+        } else if (data.user.role === 'EMPLOYEE') {
+          router.push('/employee/markets')
         } else {
+          router.push('/categories')
+        }
+      } else {
           router.push('/login')
         }
       } catch {

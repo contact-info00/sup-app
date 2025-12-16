@@ -39,11 +39,11 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Generate unique filename (store under uploads/ folder in bucket)
-    const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase();
-    const filename = `uploads/${randomUUID()}.${ext}`;
+    // Generate unique filename
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = `${randomUUID()}.${ext}`;
 
-    // Upload to Supabase Storage (bucket: public)
+    // Upload to Supabase Storage (bucket: uploads)
     const { data, error } = await supabaseAdmin.storage
       .from('uploads')
       .upload(filename, buffer, {
@@ -54,7 +54,22 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Supabase upload error:', error);
-      return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+      
+      // Handle bucket not found error specifically
+      if (error.statusCode === '404' || error.message?.includes('Bucket not found')) {
+        return NextResponse.json(
+          { 
+            error: 'Storage bucket not configured. Please create a bucket named "uploads" in Supabase Storage, or configure local file storage.',
+            details: 'Bucket "uploads" not found in Supabase Storage'
+          },
+          { status: 503 } // Service Unavailable - configuration issue
+        );
+      }
+      
+      return NextResponse.json(
+        { error: 'Upload failed', details: error.message },
+        { status: 500 }
+      );
     }
 
     // Get public URL

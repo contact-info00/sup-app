@@ -9,7 +9,6 @@ interface Category {
   name: string
   description: string | null
   imageUrl: string | null
-  archived?: boolean
 }
 
 export default function AdminCategoriesPage() {
@@ -159,53 +158,6 @@ export default function AdminCategoriesPage() {
     }
   }
 
-  const handleArchiveToggle = async (category: Category, archived: boolean) => {
-    try {
-      const response = await fetch(`/api/categories/${category.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ archived }),
-      })
-
-      if (response.ok) {
-        fetchCategories()
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to update category')
-      }
-    } catch (error) {
-      console.error('Error updating category:', error)
-      alert('An error occurred')
-    }
-  }
-
-  const handleForceDelete = async (id: string) => {
-    if (
-      !confirm(
-        'Force delete will remove related orders/items for this category. This cannot be undone. Continue?'
-      )
-    )
-      return
-
-    try {
-      const response = await fetch(`/api/categories/${id}?force=true`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-
-      if (response.ok) {
-        fetchCategories()
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to delete category')
-      }
-    } catch (error) {
-      console.error('Error deleting category:', error)
-      alert('An error occurred')
-    }
-  }
-
   if (loading) {
     return (
       <>
@@ -254,7 +206,7 @@ export default function AdminCategoriesPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
@@ -266,7 +218,7 @@ export default function AdminCategoriesPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
                   rows={3}
                 />
               </div>
@@ -278,7 +230,7 @@ export default function AdminCategoriesPage() {
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
                 />
                 {imagePreview && (
                   <div className="mt-2">
@@ -349,17 +301,6 @@ export default function AdminCategoriesPage() {
                 <h2 className="text-xl font-semibold text-gray-900 mb-2">
                   {category.name}
                 </h2>
-                <div className="flex items-center gap-2 mb-2">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      category.archived
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}
-                  >
-                    {category.archived ? 'Archived' : 'Active'}
-                  </span>
-                </div>
                 {category.description && (
                   <p className="text-gray-600 text-sm mb-4">
                     {category.description}
@@ -373,22 +314,10 @@ export default function AdminCategoriesPage() {
                     Edit
                   </button>
                   <button
-                    onClick={() => handleArchiveToggle(category, !category.archived)}
-                    className="flex-1 bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition text-sm"
-                  >
-                    {category.archived ? 'Unarchive' : 'Archive'}
-                  </button>
-                  <button
                     onClick={() => handleDelete(category.id)}
-                    className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition text-sm"
+                    className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition text-sm"
                   >
                     Delete
-                  </button>
-                  <button
-                    onClick={() => handleForceDelete(category.id)}
-                    className="flex-1 bg-red-700 text-white px-4 py-2 rounded-lg hover:bg-red-800 transition text-sm"
-                  >
-                    Force Delete
                   </button>
                 </div>
               </div>

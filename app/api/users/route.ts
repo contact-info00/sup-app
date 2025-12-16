@@ -40,23 +40,36 @@ export async function POST(request: NextRequest) {
     await requireAdmin(request)
 
     const body = await request.json()
-    const schema = z.object({
+    
+    // Conditional schema based on role
+    const baseSchema = z.object({
       name: z.string().min(1),
-      pin: z.string().length(4, 'PIN must be exactly 4 digits'),
-      role: z.enum(['employee', 'admin']),
+      role: z.enum(['ADMIN', 'EMPLOYEE']), // MARKET_OWNER not supported without schema fields
     })
 
-    const data = schema.parse(body)
+    const baseData = baseSchema.parse(body)
+
+    // Only ADMIN and EMPLOYEE roles supported (MARKET_OWNER requires schema fields: phoneNumber, marketId)
+    const pinSchema = baseSchema.extend({
+      pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
+    })
+    const data = pinSchema.parse(body)
 
     // Check if PIN is already in use
-    const users = await prisma.user.findMany()
+    const users = await prisma.user.findMany({
+      where: {
+        role: { in: ['ADMIN', 'EMPLOYEE', 'admin', 'employee'] },
+      },
+    })
     for (const user of users) {
-      const isValid = await verifyPin(data.pin, user.pinHash)
-      if (isValid) {
-        return NextResponse.json(
-          { error: 'PIN already in use' },
-          { status: 400 }
-        )
+      if (user.pinHash) {
+        const isValid = await verifyPin(data.pin, user.pinHash)
+        if (isValid) {
+          return NextResponse.json(
+            { error: 'PIN already in use' },
+            { status: 400 }
+          )
+        }
       }
     }
 
@@ -87,6 +100,12 @@ export async function POST(request: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.errors[0].message },
+        { status: 400 }
+      )
+    }
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Unique constraint violation' },
         { status: 400 }
       )
     }

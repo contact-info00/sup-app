@@ -7,7 +7,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 export interface JWTPayload {
   userId: string
-  role: 'employee' | 'admin'
+  role: 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER'
+  marketId?: string
 }
 
 /**
@@ -47,21 +48,77 @@ export function verifyToken(token: string): JWTPayload | null {
  */
 export async function getUserFromRequest(
   request: NextRequest
-): Promise<{ userId: string; role: 'employee' | 'admin' } | null> {
-  // Try to get token from cookie first
-  const token = request.cookies.get('token')?.value || 
-                request.headers.get('authorization')?.replace('Bearer ', '')
+): Promise<{ userId: string; role: 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER'; marketId?: string } | null> {
+  try {
+    // Try to get token from cookie first
+    const token = request.cookies.get('token')?.value || 
+                  request.headers.get('authorization')?.replace('Bearer ', '')
 
-  if (!token) {
+    if (!token) {
+      return null
+    }
+
+    const payload = verifyToken(token)
+    if (!payload) {
+      return null
+    }
+
+    // Check if it's a market (MARKET_OWNER role) or a user
+    if (payload.role === 'MARKET_OWNER' && payload.marketId) {
+      // For markets, verify market exists
+      try {
+        const market = await prisma.market.findUnique({
+          where: { id: payload.marketId },
+          select: {
+            id: true,
+          },
+        })
+
+        if (!market) {
+          return null
+        }
+
+        return {
+          userId: payload.userId,
+          role: 'MARKET_OWNER',
+          marketId: payload.marketId,
+        }
+      } catch (dbError) {
+        console.error('Database error verifying market:', dbError)
+        return null
+      }
+    } else {
+      // For users (ADMIN/EMPLOYEE), verify user exists
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: payload.userId },
+          select: {
+            id: true,
+            role: true,
+          },
+        })
+
+        if (!user) {
+          return null
+        }
+
+        // Normalize role to uppercase
+        const normalizedRole = user.role.toUpperCase() as 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER'
+
+        return {
+          userId: user.id,
+          role: normalizedRole,
+          marketId: undefined,
+        }
+      } catch (dbError) {
+        console.error('Database error in getUserFromRequest:', dbError)
+        return null
+      }
+    }
+  } catch (error) {
+    // Any error means auth failed, return null (401 will be handled by caller)
     return null
   }
-
-  const payload = verifyToken(token)
-  if (!payload) {
-    return null
-  }
-
-  return payload
 }
 
 /**
@@ -69,7 +126,7 @@ export async function getUserFromRequest(
  */
 export async function requireAuth(
   request: NextRequest
-): Promise<{ userId: string; role: 'employee' | 'admin' }> {
+): Promise<{ userId: string; role: 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER'; marketId?: string }> {
   const user = await getUserFromRequest(request)
   if (!user) {
     throw new Error('Unauthorized')
@@ -82,12 +139,13 @@ export async function requireAuth(
  */
 export async function requireAdmin(
   request: NextRequest
-): Promise<{ userId: string; role: 'admin' }> {
+): Promise<{ userId: string; role: 'ADMIN' }> {
   const user = await requireAuth(request)
-  if (user.role !== 'admin') {
+  // Check if role is ADMIN (already normalized to uppercase in getUserFromRequest)
+  if (user.role !== 'ADMIN') {
     throw new Error('Forbidden: Admin access required')
   }
-  return user as { userId: string; role: 'admin' }
+  return user as { userId: string; role: 'ADMIN' }
 }
 
 

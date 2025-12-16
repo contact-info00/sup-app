@@ -65,13 +65,13 @@ export async function GET(request: NextRequest) {
       const existing = itemStats.get(itemId)
 
       if (existing) {
-        existing.totalQuantity += orderItem.quantity
-        existing.totalRevenue += Number(orderItem.lineTotal)
+        existing.totalQuantity += orderItem.quantity ?? 0
+        existing.totalRevenue += Number(orderItem.lineTotal ?? 0)
       } else {
         itemStats.set(itemId, {
           item: orderItem.item,
-          totalQuantity: orderItem.quantity,
-          totalRevenue: Number(orderItem.lineTotal),
+          totalQuantity: orderItem.quantity ?? 0,
+          totalRevenue: Number(orderItem.lineTotal ?? 0),
         })
       }
     }

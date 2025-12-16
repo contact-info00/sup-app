@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate metrics
     const totalSalesToday = orders.reduce(
-      (sum, order) => sum + Number(order.totalPrice),
+      (sum, order) => sum + Number(order.total_price),
       0
     )
 
@@ -53,8 +53,10 @@ export async function GET(request: NextRequest) {
         if (existing) {
           existing.quantity += orderItem.quantity
         } else {
+          // Use item name from relation
+          const itemName = orderItem.item?.name || `Item ${itemId}`
           itemStats.set(itemId, {
-            name: orderItem.item.name,
+            name: itemName,
             quantity: orderItem.quantity,
           })
         }

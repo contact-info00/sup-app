@@ -23,11 +23,39 @@ export default function CategoryItemsPage() {
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
   const [basket, setBasket] = useState<Map<string, number>>(new Map())
+  const [user, setUser] = useState<{ role: string } | null>(null)
 
   useEffect(() => {
+    checkAuth()
     fetchItems()
     loadBasket()
   }, [categoryId])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+        // For employees, check if market is selected
+        if (data.user.role === 'EMPLOYEE') {
+          const selectedMarketId = localStorage.getItem('selectedMarketId')
+          if (!selectedMarketId) {
+            router.push('/employee/markets')
+            return
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error)
+    }
+  }
 
   const loadBasket = () => {
     const saved = localStorage.getItem('basket')
@@ -120,9 +148,23 @@ export default function CategoryItemsPage() {
                   </span>
                   <button
                     onClick={() => addToBasket(item.id)}
-                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition text-sm font-medium"
+                    className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition text-sm font-medium flex items-center gap-2"
                   >
-                    Add to Basket
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    Add
                   </button>
                 </div>
               </div>

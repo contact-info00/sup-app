@@ -19,12 +19,53 @@ export default function AdminUsersPage() {
   const [formData, setFormData] = useState({
     name: '',
     pin: '',
-    role: 'employee' as 'employee' | 'admin',
+    phoneNumber: '',
+    role: 'EMPLOYEE' as 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER',
+    marketId: '',
   })
+  const [markets, setMarkets] = useState<Array<{ id: string; name: string }>>([])
+  const [user, setUser] = useState<{ role: string } | null>(null)
 
   useEffect(() => {
+    checkAuth()
     fetchUsers()
+    fetchMarkets()
   }, [])
+
+  const checkAuth = async () => {
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      })
+      if (response.status === 401) {
+        router.push('/login')
+        return
+      }
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user)
+        if (data.user.role !== 'ADMIN') {
+          router.push('/categories')
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error)
+    }
+  }
+
+  const fetchMarkets = async () => {
+    try {
+      const response = await fetch('/api/markets', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setMarkets(data)
+      }
+    } catch (error) {
+      console.error('Error fetching markets:', error)
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -58,7 +99,7 @@ export default function AdminUsersPage() {
 
       if (response.ok) {
         setShowForm(false)
-        setFormData({ name: '', pin: '', role: 'employee' })
+        setFormData({ name: '', pin: '', phoneNumber: '', role: 'EMPLOYEE', marketId: '' })
         fetchUsers()
       } else {
         const data = await response.json()
@@ -91,7 +132,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <>
         <Navbar />
@@ -111,7 +152,7 @@ export default function AdminUsersPage() {
           <button
             onClick={() => {
               setShowForm(true)
-              setFormData({ name: '', pin: '', role: 'employee' })
+              setFormData({ name: '', pin: '', phoneNumber: '', role: 'EMPLOYEE', marketId: '' })
             }}
             className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
           >
@@ -134,26 +175,7 @@ export default function AdminUsersPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  4-Digit PIN *
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={4}
-                  required
-                  value={formData.pin}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '')
-                    if (value.length <= 4) {
-                      setFormData({ ...formData, pin: value })
-                    }
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-center text-xl tracking-widest"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
                 />
               </div>
               <div>
@@ -163,18 +185,85 @@ export default function AdminUsersPage() {
                 <select
                   required
                   value={formData.role}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const newRole = e.target.value as 'ADMIN' | 'EMPLOYEE' | 'MARKET_OWNER'
                     setFormData({
                       ...formData,
-                      role: e.target.value as 'employee' | 'admin',
+                      role: newRole,
+                      pin: newRole === 'MARKET_OWNER' ? '' : formData.pin,
+                      phoneNumber: newRole === 'MARKET_OWNER' ? formData.phoneNumber : '',
+                      marketId: newRole === 'MARKET_OWNER' ? formData.marketId : '',
                     })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
                 >
-                  <option value="employee">Employee</option>
-                  <option value="admin">Admin</option>
+                  <option value="EMPLOYEE">Employee</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="MARKET_OWNER">Market Owner</option>
                 </select>
               </div>
+              {formData.role !== 'MARKET_OWNER' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    4-Digit PIN *
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={4}
+                    required
+                    value={formData.pin}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '')
+                      if (value.length <= 4) {
+                        setFormData({ ...formData, pin: value })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-center text-xl tracking-widest text-black"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number * (10 digits)
+                    </label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      required
+                      value={formData.phoneNumber}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+                        setFormData({ ...formData, phoneNumber: value })
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
+                      placeholder="1234567890"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Market *
+                    </label>
+                    <select
+                      required
+                      value={formData.marketId}
+                      onChange={(e) =>
+                        setFormData({ ...formData, marketId: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-black"
+                    >
+                      <option value="">Select a market...</option>
+                      {markets.map((market) => (
+                        <option key={market.id} value={market.id}>
+                          {market.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
               <div className="flex space-x-4">
                 <button
                   type="submit"
@@ -186,7 +275,7 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={() => {
                     setShowForm(false)
-                    setFormData({ name: '', pin: '', role: 'employee' })
+                    setFormData({ name: '', pin: '', phoneNumber: '', role: 'EMPLOYEE', marketId: '' })
                   }}
                   className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition"
                 >
@@ -224,8 +313,10 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        user.role === 'admin'
+                        user.role === 'ADMIN'
                           ? 'bg-purple-100 text-purple-800'
+                          : user.role === 'MARKET_OWNER'
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-blue-100 text-blue-800'
                       }`}
                     >

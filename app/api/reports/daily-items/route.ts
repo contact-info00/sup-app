@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth'
 
-// GET /api/reports/sales - Get sales report for a specific date
+// GET /api/reports/daily-items - Get daily item sold counts for a specific date
 export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request)
@@ -48,70 +48,50 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        user: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
       },
-      orderBy: { createdAt: 'desc' },
     })
 
-    // Calculate totals
-    const totalRevenue = orders.reduce(
-      (sum, order) => sum + Number(order.total_price ?? 0),
-      0
-    )
+    // Aggregate items by itemId
+    const itemCounts = new Map<
+      string,
+      { itemId: string; itemName: string; totalQuantity: number }
+    >()
 
-    const totalOrders = orders.length
+    for (const order of orders) {
+      for (const orderItem of order.orderItems) {
+        const itemId = orderItem.itemId
+        const existing = itemCounts.get(itemId)
 
-    // Calculate items sold
-    const itemsSold = orders.reduce(
-      (sum, order) =>
-        sum + order.orderItems.reduce((itemSum, item) => itemSum + (item.quantity ?? 0), 0),
-      0
+        if (existing) {
+          existing.totalQuantity += orderItem.quantity
+        } else {
+          itemCounts.set(itemId, {
+            itemId,
+            itemName: orderItem.item.name,
+            totalQuantity: orderItem.quantity,
+          })
+        }
+      }
+    }
+
+    // Convert to array and sort by quantity descending
+    const itemsList = Array.from(itemCounts.values()).sort(
+      (a, b) => b.totalQuantity - a.totalQuantity
     )
 
     return NextResponse.json({
       date: dateParam || new Date().toISOString().split('T')[0],
-      totalRevenue,
-      totalOrders,
-      itemsSold,
-      orders: orders.map(order => ({
-        id: order.id,
-        totalPrice: Number(order.total_price ?? 0),
-        createdAt: order.createdAt.toISOString(),
-        user: {
-          id: order.user.id,
-          name: order.user.name,
-        },
-        orderItems: order.orderItems.map(item => ({
-          quantity: item.quantity,
-          unitPrice: Number(item.unit_price ?? 0),
-          lineTotal: Number(item.lineTotal ?? 0),
-          item: {
-            id: item.item.id,
-            name: item.item.name,
-          },
-        })),
-      })),
+      items: itemsList,
     })
   } catch (error: any) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required') {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
+    if (error.message === 'Unauthorized' || error.message.includes('Forbidden')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    console.error('Error fetching sales report:', error)
+    console.error('Error fetching daily item counts:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
-
-
-
 

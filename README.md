@@ -264,8 +264,11 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 1. Create account at [supabase.com](https://supabase.com)
 2. Create a new project
 3. Go to Project Settings > Database
-4. Copy the connection string (use the "Connection pooling" or "Direct connection" string)
-5. Format: `postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres`
+4. Copy the connection string (use the "Connection pooling" string for `DATABASE_URL` and "Direct connection" for `DIRECT_URL`)
+5. **Important**: Add `?sslmode=require` to your connection strings
+   - For pooled connection (port 6543): `postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true&sslmode=require`
+   - For direct connection (port 5432): `postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres?sslmode=require`
+6. If using connection pooling, you need both `DATABASE_URL` (pooled) and `DIRECT_URL` (direct) in your `.env` file
 
 #### Neon
 1. Create account at [neon.tech](https://neon.tech)
