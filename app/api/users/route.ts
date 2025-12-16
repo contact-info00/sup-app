@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { requireAdmin, hashPin, verifyPin } from '@/lib/auth'
-import { z } from 'zod'
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAdmin, hashPin, verifyPin } from "@/lib/auth";
+import { z } from "zod";
 
 // GET /api/users - Get all users (admin only)
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request)
+    await requireAdmin(request);
 
     const users = await prisma.user.findMany({
       select: {
@@ -15,71 +15,61 @@ export async function GET(request: NextRequest) {
         role: true,
         createdAt: true,
       },
-      orderBy: { createdAt: 'desc' },
-    })
+      orderBy: { createdAt: "desc" },
+    });
 
-    return NextResponse.json(users)
+    return NextResponse.json(users);
   } catch (error: any) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required') {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
+    const msg = String(error?.message || "");
+    if (msg === "Unauthorized" || msg === "Forbidden: Admin access required") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    console.error('Error fetching users:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+
+    console.error("Error fetching users:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 // POST /api/users - Create user (admin only)
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request)
+    await requireAdmin(request);
 
-    const body = await request.json()
-    
-    // Conditional schema based on role
-    const baseSchema = z.object({
-      name: z.string().min(1),
-      role: z.enum(['ADMIN', 'EMPLOYEE']), // MARKET_OWNER not supported without schema fields
-    })
+    const body = await request.json();
 
-    const baseData = baseSchema.parse(body)
+    // Accept both uppercase & lowercase to avoid breaking old data
+    const schema = z.object({
+      name: z.string().min(1, "Name is required"),
+      role: z.enum(["ADMIN", "EMPLOYEE", "admin", "employee"]),
+      pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
+    });
 
-    // Only ADMIN and EMPLOYEE roles supported (MARKET_OWNER requires schema fields: phoneNumber, marketId)
-    const pinSchema = baseSchema.extend({
-      pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
-    })
-    const data = pinSchema.parse(body)
+    const data = schema.parse(body);
 
-    // Check if PIN is already in use
-    const users = await prisma.user.findMany({
-      where: {
-        role: { in: ['ADMIN', 'EMPLOYEE', 'admin', 'employee'] },
-      },
-    })
-    for (const user of users) {
-      if (user.pinHash) {
-        const isValid = await verifyPin(data.pin, user.pinHash)
-        if (isValid) {
-          return NextResponse.json(
-            { error: 'PIN already in use' },
-            { status: 400 }
-          )
-        }
+    // Normalize role to what your app expects (keep uppercase)
+    const normalizedRole =
+      data.role === "admin" ? "ADMIN" : data.role === "employee" ? "EMPLOYEE" : data.role;
+
+    // Check if PIN is already in use (compare against hashes)
+    const existingUsers = await prisma.user.findMany({
+      select: { id: true, pinHash: true },
+    });
+
+    for (const u of existingUsers) {
+      if (!u.pinHash) continue;
+      const match = await verifyPin(data.pin, u.pinHash);
+      if (match) {
+        return NextResponse.json({ error: "PIN already in use" }, { status: 400 });
       }
     }
 
-    const pinHash = await hashPin(data.pin)
+    const pinHash = await hashPin(data.pin);
 
     const user = await prisma.user.create({
       data: {
         name: data.name,
         pinHash,
-        role: data.role,
+        role: normalizedRole,
       },
       select: {
         id: true,
@@ -87,33 +77,24 @@ export async function POST(request: NextRequest) {
         role: true,
         createdAt: true,
       },
-    })
+    });
 
-    return NextResponse.json(user, { status: 201 })
+    return NextResponse.json(user, { status: 201 });
   } catch (error: any) {
-    if (error.message === 'Unauthorized' || error.message === 'Forbidden: Admin access required') {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      )
+    const msg = String(error?.message || "");
+    if (msg === "Unauthorized" || msg === "Forbidden: Admin access required") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.errors[0].message },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: error.errors[0]?.message || "Invalid input" }, { status: 400 });
     }
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Unique constraint violation' },
-        { status: 400 }
-      )
+
+    if (error?.code === "P2002") {
+      return NextResponse.json({ error: "Unique constraint violation" }, { status: 400 });
     }
-    console.error('Error creating user:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+
+    console.error("Error creating user:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
