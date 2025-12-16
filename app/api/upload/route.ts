@@ -56,7 +56,8 @@ export async function POST(request: NextRequest) {
       console.error('Supabase upload error:', error);
       
       // Handle bucket not found error specifically
-      if (error.statusCode === '404' || error.message?.includes('Bucket not found')) {
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('Bucket not found') || errorMessage.includes('not found')) {
         return NextResponse.json(
           { 
             error: 'Storage bucket not configured. Please create a bucket named "uploads" in Supabase Storage, or configure local file storage.',
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
       }
       
       return NextResponse.json(
-        { error: 'Upload failed', details: error.message },
+        { error: 'Upload failed', details: errorMessage },
         { status: 500 }
       );
     }
